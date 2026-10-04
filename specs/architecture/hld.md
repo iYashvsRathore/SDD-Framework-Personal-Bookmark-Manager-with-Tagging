@@ -118,42 +118,42 @@ sequenceDiagram
   participant F as title fetcher
   participant D as data / SQLite
 
-  U->>W: Submit URL (+ optional title, tags)
+  U->>W: Submit URL with optional title and tags
   W->>W: Disable submit button (EC18 double-submit)
   W->>R: POST /api/bookmarks
   R->>S: create(payload)
-  S->>S: trim, length <= 2048, parse, scheme in {http,https}, host required
+  S->>S: Trim the URL then enforce length at most 2048 then parse and require an http or https scheme and a host
   alt invalid (EC01-EC04)
     S-->>R: AppError INVALID_URL + field message
-    R-->>W: 400 { error: { code, message, field } }
-    W-->>U: Inline text under the field, focus moved to it
+    R-->>W: Return 400 with the error code and field message
+    W-->>U: Show inline field text then move focus to the field
   else valid
-    S->>S: normalize -> url_normalized (INV-02, EC20)
+    S->>S: Normalize to url_normalized for INV-02 and EC20
     S->>D: find live bookmark by url_normalized
     alt duplicate (EC05)
       D-->>S: existing row
       S-->>R: AppError DUPLICATE_URL + existing id
-      R-->>W: 409 { error: { code, message, existingId } }
-      W-->>U: Banner with "View existing" / "Edit existing"
+      R-->>W: Return 409 with the error code and existing id
+      W-->>U: Show the banner with View existing or Edit existing
     else new
       alt no user title supplied
         S->>F: fetchTitle(url)  [total budget 5 s]
-        F->>F: resolve DNS, reject private/loopback/link-local/reserved (EC09)
-        F->>F: GET, text/html only, 512 KB cap, stop after </title> (EC08)
-        F->>F: manual redirects, max 3, re-validate every hop (RK02)
+        F->>F: Resolve DNS then reject private loopback link-local or reserved addresses (EC09)
+        F->>F: GET text/html only with a 512 KB cap and stop after the title (EC08)
+        F->>F: Follow at most 3 redirects manually and revalidate every hop (RK02)
         alt fetched
-          F-->>S: { ok: true, title }  -> title_source = 'fetched'
-        else refused, timed out, non-HTML, 4xx/5xx, loop (EC06)
-          F-->>S: { ok: false, reason } -> title = hostname minus leading "www.", title_source = 'hostname'
+          F-->>S: Fetch succeeded with title_source fetched
+        else fetch refused or timed out or returned non-HTML or failed with 4xx/5xx or looped (EC06)
+          F-->>S: Fetch failed so use hostname without leading www as title and set title_source hostname
         end
       else user title supplied
-        S->>S: title_source = 'user' (no outbound call at all)
+        S->>S: Use the user title and make no outbound call
       end
-      S->>D: BEGIN; insert bookmark; upsert tags; insert links; COMMIT (EC19)
+      S->>D: Begin transaction then insert bookmark then upsert tags then insert links then commit (EC19)
       D-->>S: saved row
       S-->>R: bookmark + title_source
-      R-->>W: 201 { bookmark }
-      W-->>U: Row prepended; if title_source = 'hostname', non-blocking notice
+      R-->>W: Return 201 with the bookmark
+      W-->>U: Prepend the row and show a non-blocking notice when title_source is hostname
     end
   end
 ```
@@ -170,20 +170,20 @@ sequenceDiagram
   participant S as bookmark service
   participant D as data / SQLite
 
-  U->>W: Type in search, click a tag, or change page size
-  W->>W: Debounce 250 ms; write q / tag / page / size into the URL query
+  U->>W: Type in search or click a tag or change page size
+  W->>W: Debounce for 250 ms then write q tag page and size to the URL query
   W->>R: GET /api/bookmarks?q=&tag=&page=&size=
   R->>S: list(query)
-  S->>S: clamp size to {10,20,50}, page to >= 1 (EC24)
-  S->>S: escape % and _ in q, build ONE predicate set
+  S->>S: Clamp size to 10 or 20 or 50 and page to at least 1 (EC24)
+  S->>S: Escape percent and underscore in q then build one predicate set
   S->>D: COUNT(*) with the predicates
   D-->>S: total
-  S->>S: clamp page to ceil(total/size); recompute offset (EC22, EC23)
-  S->>D: SELECT page with LIMIT/OFFSET, ORDER BY created_at DESC, id DESC
+  S->>S: Clamp page to ceiling of total divided by size then recompute offset for EC22 and EC23
+  S->>D: Select page with limit and offset ordered by created_at descending then id descending
   D-->>S: rows + their tags
-  S-->>R: { items, total, page, size }
+  S-->>R: Return items with total page and size
   R-->>W: 200
-  W-->>U: List, or the matching empty state (no bookmarks / no results / empty tag)
+  W-->>U: Show the list or the matching empty state for no bookmarks no results or an empty tag filter
 ```
 
 The count query and the page query are built from the **same** predicate set (AD-07). Building them separately is the defect this design is written to prevent: `total` would disagree with the rows and the page clamp would be wrong.
@@ -203,19 +203,19 @@ sequenceDiagram
   participant D as data / SQLite
 
   U->>W: Click Delete on a row
-  W-->>U: Confirmation dialog, focus on Cancel (U4)
+  W-->>U: Show confirmation dialog with focus on Cancel (U4)
   U->>W: Confirm
   W->>R: DELETE /api/bookmarks/:id
   R->>S: softDelete(id)
   S->>D: UPDATE bookmark SET deleted_at = now WHERE id = ? AND deleted_at IS NULL
-  alt 0 rows changed (already deleted in another tab, EC21)
+  alt 0 rows changed because it was already deleted in another tab (EC21)
     S-->>R: AppError NOT_FOUND
     R-->>W: 404
-    W-->>U: "That bookmark is no longer here." + refresh list
+    W-->>U: That bookmark is no longer here then refresh the list
   else 1 row changed
     D-->>S: ok
     R-->>W: 204
-    W-->>U: Undo toast; list reloads; page clamps down if the page is now empty (EC23); tag rail drops orphaned tags (EC17)
+    W-->>U: Show Undo toast then reload list then clamp page if empty (EC23) and remove orphaned tags from the rail (EC17)
   end
   opt User presses Undo
     W->>R: POST /api/bookmarks/:id/restore
@@ -224,11 +224,11 @@ sequenceDiagram
     alt the URL was re-added meanwhile (EC21)
       S-->>R: AppError DUPLICATE_URL
       R-->>W: 409
-      W-->>U: "That address has been saved again since. Nothing was restored."
+      W-->>U: That address was saved again so nothing was restored
     else
       S->>D: UPDATE bookmark SET deleted_at = NULL WHERE id = ?
-      R-->>W: 200 { bookmark }
-      W-->>U: Row returns to its original position (created_at unchanged, AS02)
+      R-->>W: Return 200 with the bookmark
+      W-->>U: Restore the row to its original position with created_at unchanged (AS02)
     end
   end
 ```
