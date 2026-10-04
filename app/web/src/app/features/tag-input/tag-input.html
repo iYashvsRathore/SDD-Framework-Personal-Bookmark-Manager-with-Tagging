@@ -1,0 +1,35 @@
+<!--
+  F02-AC10: chips are rendered before the input, matching the mockup's DOM
+  order, so Tab reaches each remove button before the text field. Every chip's
+  remove button carries its own accessible name; the input itself is labelled
+  with a visible <label for>.
+-->
+<label for="tg">Tags <span class="opt">(press Enter or comma)</span></label>
+<div class="ci">
+  @for (chip of store.tags(); track chip) {
+    <span class="chip">
+      {{ chip }}
+      <button type="button" [attr.aria-label]="'Remove tag ' + chip" (click)="removeChip(chip)">
+        ×
+      </button>
+    </span>
+  }
+  <input
+    #tagInput
+    id="tg"
+    list="tag-suggestions"
+    autocomplete="off"
+    placeholder="Add a tag"
+    aria-describedby="tgerr"
+    [attr.aria-invalid]="store.tagsError() ? 'true' : null"
+    (keydown)="onKeydown($event)"
+    (input)="onInput($event)"
+    (focus)="onFocus()"
+  />
+</div>
+<datalist id="tag-suggestions">
+  @for (suggestion of store.tagSuggestions(); track suggestion) {
+    <option [value]="suggestion"></option>
+  }
+</datalist>
+<p class="err" id="tgerr" aria-live="polite">{{ store.tagsError() }}</p>

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "repoLayout": "monorepo",
+  "orchestratorRoot": ".",
+  "specsPath": "specs",
+  "docsPath": "docs",
+  "components": [
+    {
+      "id": "<kebab-case-id>",
+      "name": "<human name>",
+      "type": "frontend | backend | fullstack | shared | worker",
+      "workspaceRoot": ".",
+      "path": "<path relative to workspaceRoot>",
+      "repo": null,
+      "language": "<language>",
+      "framework": "<framework>",
+      "dependsOn": [],
+      "dataStore": {
+        "kind": "<sqlite | json-file | none>",
+        "location": "<relative path to data file or null>"
+      },
+      "commands": {
+        "install": "<cmd>",
+        "format": "<cmd>",
+        "lint": "<cmd>",
+        "build": "<cmd or null for interpreted stacks>",
+        "start": "<cmd>",
+        "test": "<cmd>",
+        "coverage": "<cmd or null>",
+        "audit": "<cmd>"
+      },
+      "smoke": {
+        "baseUrl": "http://localhost:<port>",
+        "checks": [
+          { "method": "GET", "path": "/", "expectStatus": 200 }
+        ],
+        "startupTimeoutSeconds": 20
+      }
+    }
+  ]
+}

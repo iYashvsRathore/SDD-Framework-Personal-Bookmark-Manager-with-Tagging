@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "repoLayout": "monorepo",
+  "orchestratorRoot": ".",
+  "specsPath": "specs",
+  "docsPath": "docs",
+  "components": [
+    {
+      "id": "api",
+      "name": "TagVault API",
+      "type": "backend",
+      "workspaceRoot": ".",
+      "path": "app/api",
+      "repo": null,
+      "language": "JavaScript",
+      "framework": "Express 5.2.1",
+      "dependsOn": [],
+      "dataStore": {
+        "kind": "sqlite",
+        "location": "app/api/data/tagvault.db"
+      },
+      "commands": {
+        "install": "npm ci",
+        "format": "npx prettier --write .",
+        "lint": "npx eslint . --fix",
+        "build": null,
+        "start": "node src/server.js",
+        "test": "npx vitest run",
+        "coverage": "npx vitest run --coverage",
+        "audit": "npm audit --omit=dev"
+      },
+      "smoke": {
+        "baseUrl": "http://localhost:3000",
+        "checks": [
+          { "method": "GET", "path": "/api/health", "expectStatus": 200 },
+          { "method": "GET", "path": "/api/bookmarks", "expectStatus": 200 },
+          { "method": "GET", "path": "/api/tags", "expectStatus": 200 }
+        ],
+        "startupTimeoutSeconds": 20
+      }
+    },
+    {
+      "id": "web",
+      "name": "TagVault Web",
+      "type": "frontend",
+      "workspaceRoot": ".",
+      "path": "app/web",
+      "repo": null,
+      "language": "TypeScript",
+      "framework": "Angular 22.2.0 (zoneless)",
+      "dependsOn": ["api"],
+      "dataStore": {
+        "kind": "none",
+        "location": null
+      },
+      "commands": {
+        "install": "npm ci",
+        "format": "npx prettier --write .",
+        "lint": "npx eslint . --fix",
+        "build": "npx ng build",
+        "start": "npx ng serve",
+        "test": "npx ng test",
+        "coverage": "npx ng test --coverage",
+        "audit": "npm audit --omit=dev"
+      },
+      "smoke": {
+        "baseUrl": "http://localhost:4200",
+        "checks": [{ "method": "GET", "path": "/", "expectStatus": 200 }],
+        "startupTimeoutSeconds": 60
+      }
+    }
+  ]
+}

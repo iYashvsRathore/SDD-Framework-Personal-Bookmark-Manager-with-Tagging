@@ -1,0 +1,10 @@
+<div id="toasts" aria-live="polite" aria-atomic="true">
+  @if (store.toast(); as message) {
+    <div class="toast">
+      {{ message }}
+      @if (store.toastUndo(); as undo) {
+        <button type="button" [disabled]="undoDisabled()" (click)="onUndo()">Undo</button>
+      }
+    </div>
+  }
+</div>

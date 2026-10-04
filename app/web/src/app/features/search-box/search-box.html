@@ -1,0 +1,26 @@
+<!--
+  F05-AC12, AC13: ported from `docs/mockup.html`'s `.search` markup. The label
+  is visually hidden (`.sr`, defined in F05-T11's styles.css port) but present
+  for assistive tech; the search icon is decorative (`aria-hidden`); `#qx` is
+  only rendered in the DOM once there is text to clear, so it is never a
+  reachable no-op stop on the Tab order.
+-->
+<label class="sr" for="q">Search bookmarks by title or web address</label>
+<span class="ic si" aria-hidden="true">
+  <svg viewBox="0 0 24 24"><path [attr.d]="icons.search" /></svg>
+</span>
+<input
+  #searchInput
+  id="q"
+  type="search"
+  placeholder="Search title or URL"
+  autocomplete="off"
+  (input)="onInput($event)"
+/>
+@if (hasText()) {
+  <button class="cl" type="button" aria-label="Clear search" (click)="onClear()">
+    <span class="ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path [attr.d]="icons.x" /></svg>
+    </span>
+  </button>
+}

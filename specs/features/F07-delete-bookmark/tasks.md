@@ -1,0 +1,72 @@
+# F07: Delete Bookmark (Tasks)
+
+**LLD version:** 1
+**Owner:** dev-1
+
+> One task at a time. Each task ends with the build-verify loop (format → lint → build → start → smoke → tests). Max **3** fix attempts, then stop and ask the human.
+
+## Tasks
+
+| Task ID | Description | Component id | Files | Covers AC | Done when | Status |
+|---|---|---|---|---|---|---|
+| F07-T01 | Add `restoreDuplicateUrlError(existing)` to `app-error.js` — the one place the restore-specific 409 message is constructed (LD-03) | api | `src/lib/app-error.js` | F07-AC7 | Function exported, returns `AppError('DUPLICATE_URL', 'That address has been saved again since. Nothing was restored.', { field: 'url', existingId })`; app builds and starts | done |
+| F07-T02 | Add `softDelete(id, deletedAt)`, `findDeletedById(id)`, `restore(id, urlNormalized)` to `bookmark-repository.js` (three prepared statements, no new transaction) | api | `src/data/bookmark-repository.js` | F07-AC3, AC4, AC6, AC7, AC8, AC9, AC10 | Each function callable directly against a `:memory:` db; `restore` catches `SQLITE_CONSTRAINT_UNIQUE` and throws via `restoreDuplicateUrlError`; app builds and starts | done |
+| F07-T03 | Add `softDelete(id)` and `restore(id)` to `bookmark-service.js`, each rejecting a non-integer `id` with `NOT_FOUND` before any repository call | api | `src/services/bookmark-service.js` | F07-AC6, AC7, AC8, AC9, AC10 | Both functions callable directly with raw (including invalid) ids, matching the route's own behavior; app builds and starts | done |
+| F07-T04 | Add `DELETE /bookmarks/:id` and `POST /bookmarks/:id/restore` to `routes/bookmarks.js`, grouped with the existing single-resource routes | api | `src/routes/bookmarks.js` | F07-AC3, AC4, AC6, AC8, AC9, AC10 | `curl -X DELETE`/`curl -X POST .../restore` against a running server return the documented status/body for a live row, an already-deleted row, and an invalid id; app builds, starts, smoke passes | done |
+| F07-T05 | Write `test/delete-bookmark.test.js` — service + route specs for `softDelete`, including the double-activation race and the restart-integrity check | api | `test/delete-bookmark.test.js` | F07-AC3, AC6, AC9, AC10, AC14 | `npx vitest run` passes; covers a live delete, a second delete on the same id (404), and every invalid-`:id` shape from F07-AC10. **Correction (F07-RV02, `/review-phase`):** the F07-AC14 restart check and the F07-AC11/AC12/AC13 pagination-clamp/tag-rail/empty-list cases were NOT actually written at this task — despite this row's original claim — until `/test-phase F07-delete-bookmark` found and closed the gap (E-testing-701) | done |
+| F07-T06 | Write `test/restore-bookmark.test.js` — service + route specs for `restore`, including the duplicate-URL race and the restart-integrity check | api | `test/restore-bookmark.test.js` | F07-AC4, AC7, AC8, AC10, AC15 | `npx vitest run` passes; covers a successful restore, the 409 race (re-add the URL before restoring), and every F07-AC8/AC10 not-found shape. **Correction (F07-RV02, `/review-phase`):** the F07-AC15 restart check was NOT actually written at this task — despite this row's original claim — until `/test-phase F07-delete-bookmark` found and closed the gap (E-testing-701) | done |
+| F07-T07 | Add `RestoreBookmarkResponse` type; add `deleteBookmark(id)`/`restoreBookmark(id)` to `ApiService` | web | `src/app/core/models.ts`, `src/app/core/api.service.ts` | F07-AC3, AC4, AC6, AC7, AC8 | Both methods callable against `provideHttpClientTesting()`; app builds | done |
+| F07-T08 | Generalize `BookmarksStore`'s toast into `showToast(message, onUndo?)`/`clearToast()` with a 6 s timer (LD-02); rewrite `save()`'s three existing `toast.set(...)` calls to use it; add `toastUndo` signal | web | `src/app/state/bookmarks.store.ts` | F07-AC5, F07-EC3 | A new `showToast()` call cancels any pending timer from a previous toast; the toast clears itself after 6,000 ms if untouched, asserted with `vi.useFakeTimers()`; F01's/F06's existing save-toast tests still pass unchanged | done |
+| F07-T09 | Add `BookmarksStore.deleteBookmark(item)` and `restoreBookmark(id)`, wired through `showToast`/`clearToast` | web | `src/app/state/bookmarks.store.ts` | F07-AC3, AC4, AC6, AC7, AC8, AC9 | A successful delete shows the toast and calls `loadList()`; a 404 on delete silently calls `loadList()` with no toast; a successful restore clears the toast and calls `loadList()`; a 409/404 on restore replaces the toast text with the server's message and removes the Undo action | done |
+| F07-T10 | Create `features/delete-confirm/` (`delete-confirm.ts`, `delete-confirm.html`), ported from `docs/mockup.html`'s `#dd` dialog | web | `src/app/features/delete-confirm/delete-confirm.ts`, `delete-confirm.html` | F07-AC1, AC2, AC16 | `open(item, opener)` focuses Cancel, not Delete; Esc/Cancel close the dialog and return focus to `opener`; Confirm disables the Delete button and calls `store.deleteBookmark(item)`; app builds and starts | done |
+| F07-T11 | Wire `BookmarkList`'s existing (unhandled) Delete button to a new `deleteRequested` output, mirroring the existing `editRequested` wiring | web | `src/app/features/bookmark-list/bookmark-list.ts`, `bookmark-list.html` | F07-AC1 | Clicking a card's Delete button emits `{ item, opener }`; app builds and starts | done |
+| F07-T12 | Render an `Undo` button in `Toast` when `store.toastUndo()` is set | web | `src/app/features/toast/toast.ts`, `toast.html` | F07-AC4, AC16 | The Undo button appears only while `toastUndo()` is non-null, is a real `<button>`, and is removed the instant it is clicked; app builds and starts | done |
+| F07-T13 | Wire `<app-delete-confirm>` into the app shell, mirroring the existing `onEditClick` → `openEdit()` pattern | web | `src/app/app.ts`, `src/app/app.html` | F07-AC1, AC3 | Clicking any card's Delete button opens the confirmation dialog naming that bookmark; app builds, starts, smoke passes | done |
+| F07-T14 | Port `.btn.bad`, `.prev` (dialog) and the `.toast button` (Undo) rules from `docs/mockup.html` | web | `src/styles.css` | F07-AC1, AC16 | The Delete button and the title/URL preview render per the mockup; the Undo button is visually distinct and keyboard-focusable; app builds and starts | done |
+| F07-T15 | Add/extend Vitest + `TestBed` specs: `bookmarks.store.spec.ts` (toast timer, delete/restore paths), `delete-confirm.spec.ts` (new), `bookmark-list.spec.ts` (Delete wiring), `toast.spec.ts` (new) | web | `src/app/state/bookmarks.store.spec.ts`, `src/app/features/delete-confirm/delete-confirm.spec.ts`, `src/app/features/bookmark-list/bookmark-list.spec.ts`, `src/app/features/toast/toast.spec.ts` | F07-AC1, AC2, AC3, AC4, AC5, AC6, AC7, AC8, AC9, AC16 | `npx ng test` passes; every listed AC has at least one passing assertion | done |
+
+Status values: `todo`, `in-progress`, `done`, `blocked`.
+
+**Note (F07-RV02, added at `/review-phase`, 2026-10-03):** F07-AC11 (pagination clamp), F07-AC12 (tag-rail trigger) and F07-AC13 (empty-list trigger) were never assigned to any task row above — the planning→build flow-down dropped them, and no build task's `Done when` text claimed them either. They were only discovered missing and closed during `/test-phase F07-delete-bookmark` (E-testing-701), not at build. See `docs/04-testing.md`'s Fail→Fix→Retest section for the honest record of this gap.
+
+## Build-Verify Log (actual results only)
+
+| Task | Attempt | Step (format/lint/build/start/smoke/test) | Command | Result (observed) | Action |
+|---|---|---|---|---|---|
+| F07-T01 | 1 | format/lint | `npx prettier --write .` / `npx eslint . --fix` | All files unchanged, 0 errors | none |
+| F07-T02–T04 | 1 | format/lint | `npx prettier --write .` / `npx eslint . --fix` | All files unchanged, 0 errors | none |
+| F07-T02–T04 | 1 | test (regression) | `npx vitest run` | 28 files, 472 passed, 0 failed | none |
+| F07-T02–T04 | 1 | start | `node src/server.js` (fresh terminal, after killing a stale process that had been holding port 3000) | `[api] TagVault API listening on http://localhost:3000` | none |
+| F07-T02–T04 | 1 | smoke (new routes) | `curl -X DELETE/POST` against a live bookmark, a re-delete, a restore, an invalid `:id`, a not-found restore, and the restore 409 race (re-add the URL then restore) | 204, 404 `NOT_FOUND`, 200 `{bookmark}`, 404, 404, 409 `DUPLICATE_URL` — exact bodies match lld.md section 4 | none |
+| F07-T02–T04 | 1 | smoke (component-map) | `GET /api/health`, `GET /api/bookmarks`, `GET /api/tags` | 200, 200, 200 | none |
+| F07-T05–T06 | 1 | format/lint | `npx prettier --write .` / `npx eslint . --fix` | All files unchanged, 0 errors | none |
+| F07-T05–T06 | 1 | test | `npx vitest run` | 2 files failed (17 tests), 486 passed of 503 | Investigated: `softDelete`/`restore` are synchronous (matching `list()`'s shape); tests wrote `expect(service.softDelete(id)).rejects.toMatchObject(...)`, but a sync throw happens while evaluating the argument, before `expect()` runs — so the thrown `AppError` surfaced as the test's own uncaught exception, not a matcher mismatch |
+| F07-T05–T06 | 2 | fix | Replaced every `.rejects.toMatchObject(...)` on `service.softDelete`/`service.restore` with a `captureError(() => ...)` helper that catches the synchronous throw, then asserts `toMatchObject` on the captured error; also fixed `liveRows()` in delete-bookmark.test.js (it selected all rows instead of filtering `deleted_at IS NULL`) | n/a | fixed |
+| F07-T05–T06 | 2 | format/lint | `npx prettier --write .` / `npx eslint . --fix` | All files unchanged, 0 errors | none |
+| F07-T05–T06 | 2 | test | `npx vitest run` | 30 files passed, 503 passed, 0 failed | none |
+| F07-T07 | 1 | format/lint | `npx prettier --write` / `npx eslint --fix` on `models.ts`/`api.service.ts` | Unchanged, 0 errors | none |
+| F07-T07 | 1 | build | `npx ng build` | Failed: `TS2552: Cannot find name 'RestoreBookmarkResponse'` | Missing import — added `RestoreBookmarkResponse` to the `./models` type import in `api.service.ts` |
+| F07-T07 | 2 | build | `npx ng build` | Compiled successfully | Discovered and reverted an unrelated, unintended change already present in `models.ts` before this task started: `DEFAULT_PAGE_SIZE` had been edited to `10` (should be `20` per F03-AC5); reverted |
+| F07-T07 | 2 | test | `npx ng test --watch=false` | 13 files passed, 191 passed, 0 failed (the `search-box.spec.ts` failures seen before the `DEFAULT_PAGE_SIZE` revert are gone) | none |
+| F07-T08–T09 | 1 | format/lint | `npx prettier --write` / `npx eslint --fix` on `bookmarks.store.ts` | Unchanged, 0 errors | none |
+| F07-T08–T09 | 1 | build | `npx ng build` | Compiled successfully | none |
+| F07-T08–T09 | 1 | test (regression) | `npx ng test --watch=false` | 13 files passed, 191 passed, 0 failed (new behavior's own specs are written in F07-T15) | none |
+| F07-T10 | 1 | format/lint/build | `npx prettier --write` / `npx eslint --fix` on `delete-confirm.ts`/`.html` / `npx ng build` | All unchanged, 0 errors; build compiled (component not yet referenced, so tree-shaken — expected until F07-T13) | none |
+| F07-T11 | 1 | format/lint/build/test | same commands on `bookmark-list.ts`/`.html` | Unchanged, 0 errors; build compiled; 13 files passed, 191 passed | none |
+| F07-T12 | 1 | format/lint/build/test | same commands on `toast.ts`/`.html` | Unchanged, 0 errors; build compiled; 13 files passed, 191 passed | none |
+| F07-T13 | 1 | format/lint/build/test | same commands on `app.ts`/`.html` | Unchanged, 0 errors; build compiled (bundle grew, confirming `DeleteConfirm` is now included); 13 files passed, 191 passed | none |
+| F07-T13 | 1 | start/smoke | `node src/server.js`; `curl http://localhost:3000/` | `[api] TagVault API listening...`; `200` | none |
+| F07-T14 | 1 | format/build/test | `npx prettier --write src/styles.css` / `npx ng build` / `npx ng test --watch=false` | Unchanged; build compiled (styles bundle grew from 8.30 kB to 8.62 kB); 13 files passed, 191 passed | none |
+| F07-T15 | 1 | format/lint | `npx prettier --write` / `npx eslint --fix` on all four spec files plus `toast.ts` | All unchanged except `bookmarks.store.spec.ts` (import list reformatted); `toast.spec.ts` had 3 `@typescript-eslint/no-empty-function` errors | Replaced the three empty `() => {}` mock-undo arrow functions with `() => undefined` |
+| F07-T15 | 1 | test | `npx ng test --watch=false` | 1 file failed (6 tests) in `bookmarks.store.spec.ts`: `Expected one matching request... found none` for the post-delete/restore list-reload GET | The reload is fired via `void this.loadList()` in a `finally` block and is never awaited by `deleteBookmark`/`restoreBookmark` — the GET is only dispatched once the outer `await pending` in the test lets that microtask run, so `expectOne(GET)` has to come *after* `await pending`, not before it (it was ordered before) |
+| F07-T15 | 2 | fix | Reordered every delete/restore test to `flush(DELETE/POST)` → `await pending` → `flushListReload()` (extracted as a small helper); build/lint unaffected | n/a | fixed |
+| F07-T15 | 2 | build/test | `npx ng build` / `npx ng test --watch=false` | Compiled successfully; 15 files passed, 207 passed, 0 failed | none |
+| F07-T15 | 2 | lint (whole project) | `npx eslint . --fix` | 0 errors | none |
+
+## Plan vs. Actual
+
+| Task | Planned | Actual | Deviation reason |
+|---|---|---|---|
+| F07-T05, F07-T06 | `.rejects.toMatchObject(...)` against `service.softDelete`/`service.restore` | Used a sync `captureError()` helper instead | `softDelete`/`restore` are plain synchronous functions (lld.md section 11, matching `list()`), not async — `.rejects` requires a Promise, so the original tests misdiagnosed their own authoring bug as a production bug until traced to this |
+| F07-T07 | Add `RestoreBookmarkResponse` and the two `ApiService` methods, nothing else | Also reverted `DEFAULT_PAGE_SIZE` in `models.ts` back to `20` | Found it already altered to `10` in the working tree with no task authorizing that change, breaking `search-box.spec.ts` (which asserts `size=20`); reverted to restore F03-AC5's documented default |
+| F07-T15 | Write delete/restore store specs flushing the list-reload GET immediately after flushing the DELETE/POST | Moved the GET flush to after `await pending` | `deleteBookmark`/`restoreBookmark` fire their list reload via an un-awaited `void this.loadList()` in `finally`, so the GET is only dispatched once that microtask runs — which requires awaiting the outer promise first |

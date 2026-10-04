@@ -1,0 +1,75 @@
+<!--
+  The F01 shell (F01-AC17). Keyboard contract:
+  - Tab reaches "Add bookmark" with the :focus-visible outline from styles.css.
+  - The toast region is a live region that exists from first paint, so the first
+    announcement is not missed by a screen reader.
+  F08: the header theme toggle is a native <button>, reachable the same way
+  (F08-AC7) — Enter/Space activate it exactly as a click, no custom key handling.
+-->
+<header>
+  <div class="bar">
+    <span class="logo">
+      <span class="ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path [attr.d]="icons.mark" /></svg>
+      </span>
+      TagVault
+    </span>
+
+    <div class="search">
+      <app-search-box />
+    </div>
+
+    <button
+      class="btn sq"
+      type="button"
+      [attr.aria-label]="theme.theme() === 'dark' ? 'Light mode' : 'Dark mode'"
+      [attr.aria-pressed]="theme.theme() === 'dark'"
+      (click)="theme.toggle()"
+    >
+      <span class="ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path [attr.d]="theme.theme() === 'dark' ? icons.sun : icons.moon" />
+        </svg>
+      </span>
+    </button>
+
+    <button class="btn pri add" type="button" (click)="openDialog($event)">
+      <span class="ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path [attr.d]="icons.plus" /></svg>
+      </span>
+      Add bookmark
+    </button>
+  </div>
+</header>
+
+<div class="wrap">
+  <app-tag-rail />
+  <main>
+    <app-bookmark-list
+      (addRequested)="openDialog($event)"
+      (editRequested)="onEditRequested($event)"
+      (deleteRequested)="onDeleteRequested($event)"
+    />
+  </main>
+</div>
+
+<!-- Visible below 640px, where the header button is hidden. -->
+<button class="fab" type="button" aria-label="Add bookmark" (click)="openDialog($event)">
+  <span class="ic" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path [attr.d]="icons.plus" /></svg>
+  </span>
+</button>
+
+<app-bookmark-form
+  (submitted)="onSubmitted($event)"
+  (viewExisting)="onViewExisting($event)"
+  (editExisting)="onEditExisting($event)"
+/>
+
+<app-delete-confirm />
+
+<!--
+  Toast region. polite, not assertive: a save confirmation must not interrupt
+  whatever the user is doing (NFR-03).
+-->
+<app-toast />

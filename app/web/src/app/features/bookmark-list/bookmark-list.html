@@ -1,0 +1,177 @@
+<!--
+  F03-AC1, AC2, AC8, AC10, AC12. aria-busy and the count region make loading/
+  fresh state distinguishable from stale content (AC10); the error and empty
+  states are exact copy from spec.md section 2; the card markup is ported from
+  docs/mockup.html. The pagination control (F03-AC4, AC6, AC9) is a declared
+  addition with no counterpart in the mockup (hld.md section 7, U6).
+
+  F04-AC2/AC4/AC5/AC9: the active-filter chip renders beside #count (lld.md
+  section 3, LD-06); the tag-empty state (EC13) is checked before F03's own
+  empty state.
+-->
+<section class="list-region" [attr.aria-busy]="store.listLoading() ? 'true' : null">
+  <div class="meta">
+    <p id="count" aria-live="polite">{{ store.countText() }}</p>
+    @if (store.tagFilter(); as activeTag) {
+      <span id="af">
+        <span class="chip" [style.--h]="tagHue(activeTag)">
+          Tag: {{ activeTag }}
+          <button type="button" aria-label="Clear tag filter" (click)="store.clearTagFilter()">
+            &times;
+          </button>
+        </span>
+      </span>
+    }
+  </div>
+
+  @if (store.listLoading()) {
+    <p class="note">Loading bookmarks…</p>
+  }
+
+  @if (store.listError(); as message) {
+    <div class="banner" role="alert">
+      <p>{{ message }}</p>
+      <div class="row">
+        <button class="btn" type="button" (click)="store.retryList()">Retry</button>
+      </div>
+    </div>
+  } @else if (!store.listLoading() && store.allCount() === 0) {
+    <div class="empty">
+      <span class="art" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path [attr.d]="icons.mark" />
+        </svg>
+      </span>
+      <h2>No bookmarks yet</h2>
+      <p>Save your first link, then add a tag or two so it is easy to find later.</p>
+      <div class="row">
+        <button class="btn pri" type="button" (click)="addRequested.emit($event)">
+          Add bookmark
+        </button>
+      </div>
+    </div>
+  } @else if (
+    !store.listLoading() && store.items().length === 0 && store.search() !== '';
+    as isSearchEmpty
+  ) {
+    <div class="empty">
+      <span class="art" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path [attr.d]="icons.search" />
+        </svg>
+      </span>
+      <h2>No bookmarks match "{{ store.search() }}"</h2>
+      <p>Check the spelling or try fewer words. Search looks at titles and web addresses.</p>
+      <div class="row">
+        <button class="btn pri" type="button" (click)="store.clearSearch()">Clear search</button>
+        @if (store.tagFilter()) {
+          <button class="btn" type="button" (click)="store.clearTagFilter()">
+            Clear tag filter
+          </button>
+        }
+      </div>
+    </div>
+  } @else if (
+    !store.listLoading() && store.items().length === 0 && store.tagFilter();
+    as activeTagForEmpty
+  ) {
+    <div class="empty">
+      <span class="art" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path [attr.d]="icons.tag" />
+        </svg>
+      </span>
+      <h2>No bookmarks tagged "{{ activeTagForEmpty }}"</h2>
+      <p>Remove the filter to see everything you have saved.</p>
+      <div class="row">
+        <button class="btn pri" type="button" (click)="store.clearTagFilter()">
+          Clear tag filter
+        </button>
+      </div>
+    </div>
+  } @else if (store.items().length > 0) {
+    <ul class="list">
+      @for (item of store.items(); track item.id) {
+        <li class="card" [id]="'b-' + item.id">
+          <a class="title" [href]="item.url" target="_blank" rel="noopener noreferrer">{{
+            item.title
+          }}</a>
+          <p class="url">
+            <b>{{ displayUrl(item.url).host }}</b
+            >{{ displayUrl(item.url).rest }}
+          </p>
+          @if (item.tags.length > 0) {
+            <div class="tl">
+              @for (tag of item.tags; track tag) {
+                <button
+                  class="chip"
+                  type="button"
+                  [style.--h]="tagHue(tag)"
+                  [attr.aria-label]="'Filter by tag ' + tag"
+                  (click)="store.selectTag(tag)"
+                >
+                  {{ tag }}
+                </button>
+              }
+            </div>
+          }
+          <div class="foot">
+            <span class="when">Added {{ relativeTime(item.created_at) }}</span>
+            <button
+              class="act"
+              type="button"
+              [attr.aria-label]="'Edit ' + item.title"
+              title="Edit"
+              (click)="onEditClick(item, $event)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path [attr.d]="icons.edit" />
+              </svg>
+            </button>
+            <button
+              class="act del"
+              type="button"
+              [attr.aria-label]="'Delete ' + item.title"
+              title="Delete"
+              (click)="onDeleteClick(item, $event)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path [attr.d]="icons.trash" />
+              </svg>
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+
+    <nav class="pager" aria-label="Pagination">
+      <label class="page-size">
+        Per page
+        <select (change)="onPageSizeChange($event)" [disabled]="store.listLoading()">
+          @for (size of pageSizes; track size) {
+            <option [value]="size" [selected]="size === store.size()">{{ size }}</option>
+          }
+        </select>
+      </label>
+      <button
+        class="btn"
+        type="button"
+        (click)="previousPage()"
+        [disabled]="store.listLoading() || store.page() <= 1"
+      >
+        Previous
+      </button>
+      <span class="page-text" aria-live="polite"
+        >Page {{ store.page() }} of {{ store.maxPage() }}</span
+      >
+      <button
+        class="btn"
+        type="button"
+        (click)="nextPage()"
+        [disabled]="store.listLoading() || store.page() >= store.maxPage()"
+      >
+        Next
+      </button>
+    </nav>
+  }
+</section>

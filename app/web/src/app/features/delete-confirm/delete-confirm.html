@@ -1,0 +1,22 @@
+<!--
+  F07-AC1, AC2, AC16: ported from docs/mockup.html's #dd dialog. The title and
+  URL come from the already-held row (no new GET) and are rendered by
+  interpolation only, never [innerHTML] - a title containing markup renders as
+  text, the same rule F01-AC16 already fixes for the add/edit dialog.
+-->
+<dialog #dialog aria-labelledby="dd-t" (close)="onDialogClose()">
+  <h2 id="dd-t">Delete this bookmark?</h2>
+  <p>This removes it from your list. You can undo right after.</p>
+  @if (pending(); as item) {
+    <div class="prev">
+      <b>{{ item.title }}</b>
+      <span>{{ item.url }}</span>
+    </div>
+  }
+  <div class="row">
+    <button #cancelButton class="btn" type="button" (click)="close()">Cancel</button>
+    <button class="btn bad" type="button" [disabled]="confirming()" (click)="onConfirm()">
+      Delete
+    </button>
+  </div>
+</dialog>

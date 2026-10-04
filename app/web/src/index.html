@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TagVault</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!--
+      LD-02 (F08-RV01 fix): external, same-origin script so it runs under the
+      existing `script-src 'self'` CSP with no inline exception. Must stay a
+      plain, blocking <script src> (no defer/async/type=module) so it executes
+      before first paint (F08-AC2, AC3) — see public/theme-preboot.js.
+    -->
+    <script src="theme-preboot.js"></script>
+  </head>
+
+  <body>
+    <app-root></app-root>
+  </body>
+</html>

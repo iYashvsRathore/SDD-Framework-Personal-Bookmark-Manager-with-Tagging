@@ -1,0 +1,97 @@
+<!--
+  F01-AC17: every input has a <label for>, every message lives in an aria-live
+  region referenced by aria-describedby, and the dialog is a native modal so the
+  focus trap and Esc handling come from the platform.
+-->
+<dialog #dialog aria-labelledby="fd-t" (close)="onDialogClose()">
+  <form novalidate (submit)="onSubmit($event)">
+    <h2 id="fd-t">{{ store.editing() ? 'Edit bookmark' : 'Add bookmark' }}</h2>
+
+    <!--
+      F06-AC10, AC11. The row disappeared or changed elsewhere - this is not a
+      field problem, so it gets its own banner rather than reusing urlError.
+      EDIT_CONFLICT's Reload button refreshes the list and closes the dialog
+      (lld.md section 8); NOT_FOUND has no action, since there is nothing left
+      to reload into.
+    -->
+    @if (store.editBannerError(); as bannerError) {
+      <div class="banner" role="alert">
+        <strong>{{ bannerError.message }}</strong>
+        @if (bannerError.code === 'EDIT_CONFLICT') {
+          <div class="row">
+            <button class="btn" type="button" (click)="onReload()">Reload</button>
+          </div>
+        }
+      </div>
+    }
+
+    <!--
+      F01-AC11. role="alert" announces the conflict without stealing focus, so the
+      address the user typed stays where they left it. Title and URL come from the
+      API's `details` and are rendered by interpolation only - never [innerHTML] -
+      so a title containing markup is shown as text (F01-AC16).
+    -->
+    @if (store.duplicate(); as dup) {
+      <div class="banner" role="alert">
+        <strong>You already saved this link</strong>
+        <p class="dup-title">{{ dup.details?.title }}</p>
+        <p class="dup-url">{{ dup.details?.url }}</p>
+        <div class="row">
+          <button class="btn" type="button" (click)="viewExisting.emit(dup.existingId!)">
+            View existing
+          </button>
+          <button class="btn" type="button" (click)="editExisting.emit(dup.existingId!)">
+            Edit existing
+          </button>
+        </div>
+      </div>
+    }
+
+    <label for="u">Web address</label>
+    <input
+      #urlInput
+      class="in"
+      id="u"
+      type="text"
+      inputmode="url"
+      autocomplete="off"
+      placeholder="https://example.com/article"
+      aria-describedby="ue"
+      [attr.aria-invalid]="store.urlError() ? 'true' : null"
+      [value]="store.url()"
+      (input)="store.url.set($any($event.target).value)"
+    />
+    <!--
+      aria-live so the message is announced when it appears. The text itself is
+      the signal, never colour alone (NFR-03).
+    -->
+    <p class="err" id="ue" aria-live="polite">{{ store.urlError() }}</p>
+
+    <label for="t">Title <span class="opt">(optional - we'll look it up)</span></label>
+    <input
+      #titleInput
+      class="in"
+      id="t"
+      type="text"
+      autocomplete="off"
+      maxlength="140"
+      aria-describedby="tn"
+      [attr.aria-invalid]="store.titleError() ? 'true' : null"
+      [value]="store.userTitle()"
+      (input)="store.userTitle.set($any($event.target).value)"
+    />
+    <p class="err" id="tn" aria-live="polite">{{ store.titleError() }}</p>
+
+    <app-tag-input />
+
+    <!-- The in-flight wait (F01-AC3). The AC5 outcome notice is a toast: see the store. -->
+    <p class="note" aria-live="polite">{{ store.busyNote() }}</p>
+
+    <div class="row">
+      <button class="btn" type="button" (click)="close()">Cancel</button>
+      <button class="btn pri" type="submit" [disabled]="!store.canSubmit()">
+        {{ store.editing() ? 'Save changes' : 'Save bookmark' }}
+      </button>
+    </div>
+  </form>
+</dialog>
